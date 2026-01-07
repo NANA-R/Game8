@@ -6,7 +6,7 @@ from copy import copy
 def main(frameLimit, bpm, tempo, startCount):
 
   class Clock:
-    def __init__(self, color, bpm, tempo=4):
+    def __init__(self, color, bpm, screen, tempo=4):
       self.color = color
       self.speed = bpm / 60 * 6 / tempo  # 1分間に回転する角度（度）
       self.angle = 0
@@ -14,18 +14,19 @@ def main(frameLimit, bpm, tempo, startCount):
       self.angleCount = 0
       self.playingAngle = 0
       self.playing = False
+      self.screen = screen
 
-    def draw(self, screen, frame):
+    def draw(self, frame):
       self.tempAngle = copy(self.angle)
-      center = screen.get_rect().center
-      scrW, scrH = screen.get_size()
+      center = self.screen.get_rect().center
+      scrW, scrH = self.screen.get_size()
       radius = min(scrW, scrH) // 3
-      pg.draw.circle(screen, pg.Color(self.color), center, radius)
-      pg.draw.circle(screen, pg.Color("BLACK"), center, radius // 1.05)
+      pg.draw.circle(self.screen, pg.Color(self.color), center, radius)
+      pg.draw.circle(self.screen, pg.Color("BLACK"), center, radius // 1.05)
       angle = (frame * self.speed) % 360 - 90
       end_x = center[0] + radius * 0.9 * math.cos(math.radians(angle))
       end_y = center[1] + radius * 0.9 * math.sin(math.radians(angle))
-      pg.draw.line(screen, pg.Color(self.color), center, (end_x, end_y), 3)
+      pg.draw.line(self.screen, pg.Color(self.color), center, (end_x, end_y), 3)
       self.angle = int(angle)
       if self.playing:
         if self.tempAngle > self.angle:
@@ -37,7 +38,7 @@ def main(frameLimit, bpm, tempo, startCount):
       self.playing = True
 
   class Note:
-    def __init__(self, color, angle, tolerance=10, size=10):
+    def __init__(self, color, angle, screen, tolerance=10, size=10):
       self.color = color
       self.angle = angle
       self.tolerance = tolerance
@@ -47,31 +48,34 @@ def main(frameLimit, bpm, tempo, startCount):
       x = center[0] + radius * math.cos(math.radians(self.angle - 90))
       y = center[1] + radius * math.sin(math.radians(self.angle - 90))
       self.pos = (x, y)
+      self.screen = screen
 
-    def draw(self, screen):
-      pg.draw.circle(screen, pg.Color(self.color), self.pos, self.size)
+    def draw(self):
+      pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
 
-    def hitCheck(self, screen, angle):
+    def hitCheck(self, angle):
       if abs(angle - self.angle) < self.tolerance:
         return True
-      pg.draw.circle(screen, pg.Color(self.color), self.pos, self.size)
+      pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
       return False
 
-    def missCheck(self, screen, angle):
+    def missCheck(self, angle):
       if angle - self.angle > self.tolerance:
         return True
-      pg.draw.circle(screen, pg.Color(self.color), self.pos, self.size)
+      pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
       return False
 
   # テキスト描画関数
 
-  def draw_texts(counter, angle):
+  def draw_texts(counter, angle, hit, miss):
     cnt_str = f'tempo counter:{counter:05}'
     angle_str = f'angle:{angle:05}'
+    hit_str = f'hit:{hit:05}'
+    miss_str = f'miss:{miss:05}'
     screen.blit(font.render(cnt_str, True, 'WHITE'), (10, 10))
     screen.blit(font.render(angle_str, True, 'WHITE'), (10, 30))
-    screen.blit(font.render("test", True, 'WHITE'), (10, 600))
-    screen.blit(font.render("test", True, 'WHITE'), (10, 620))
+    screen.blit(font.render(hit_str, True, 'WHITE'), (10, 600))
+    screen.blit(font.render(miss_str, True, 'WHITE'), (10, 620))
 
   # 初期化処理
   pg.init()
@@ -86,9 +90,21 @@ def main(frameLimit, bpm, tempo, startCount):
   counter = 0
   exit_flag = False
   exit_code = '000'
-  notes = [360, 450, 540, 630]
+  notes = [360, 450, 540, 630,
+           720, 810, 900, 1050,
+           1080, 1170, 1260, 1350,
+           1440, 1530, 1620, 1770,
+           1800, 1890, 1980, 2070,
+           2160, 2250, 2340, 2490,
+           2520, 2610, 2700, 2790,
+           2880, 2970, 3060, 3150]
   notesCount = 0
+  displayNotesCount = 0
+  doneNotesCount = 0
   gameColor = "RED"
+  miss = 0
+  hit = 0
+  key = False
 
   try:
     pg.mixer.music.load("Polygons.mp3")
@@ -96,9 +112,9 @@ def main(frameLimit, bpm, tempo, startCount):
     print(f'音声ファイルの読み込みに失敗しました: {e}')
     exit_flag = True
     exit_code = '101'
-  GameClock = Clock(gameColor, bpm, tempo)
+  GameClock = Clock(gameColor, bpm, screen, tempo)
   for num in range(len(notes)):
-    globals()[f"note{num + 1}"] = Note(gameColor, notes[num])
+    globals()[f"note{num + 1}"] = Note(gameColor, notes[num], screen)
 
   while not exit_flag:
     # カウントダウン処理
@@ -113,13 +129,13 @@ def main(frameLimit, bpm, tempo, startCount):
       screen.fill(pg.Color('BLACK'))
 
       # 描画処理
-      if GameClock.draw(screen, frame):
+      if GameClock.draw(frame):
         if startCount - counter <= tempo and startCount != counter:
           pg.mixer.Sound('pip.mp3').play()
         counter += 1
       # フレームカウンタの表示
       frame += 1
-      draw_texts(counter, GameClock.playingAngle)
+      draw_texts(counter, GameClock.playingAngle, hit, miss)
 
       # 画面の更新とフレームレートの設定
       pg.display.update()
@@ -136,17 +152,33 @@ def main(frameLimit, bpm, tempo, startCount):
           exit_flag = True
           exit_code = '001'
         if event.type == pg.KEYDOWN:
-          pass
+          key = True
+        if event.type == pg.KEYUP:
+          key = False
+
       screen.fill(pg.Color('BLACK'))
-      if GameClock.draw(screen, frame):
+      if GameClock.draw(frame):
         counter += 1
-        pg.mixer.Sound('pip.mp3').play()
-      if notes[notesCount] - 360 < GameClock.playingAngle:
-        globals()[f"note{notesCount + 1}"].draw(screen)
-        notesCount += 1
+#        pg.mixer.Sound('pip.mp3').play()
+      try:
+        if notes[notesCount] - 360 < GameClock.playingAngle:
+          globals()[f"note{notesCount + 1}"].draw()
+          displayNotesCount += 1
+          notesCount += 1
+      except IndexError:
+        pass
+      for num in range(1, displayNotesCount):
+        if globals()[f"note{num + doneNotesCount}"].hitCheck(GameClock.playingAngle) and key:
+          doneNotesCount += 1
+          displayNotesCount -= 1
+          hit += 1
+        if globals()[f"note{num + doneNotesCount}"].missCheck(GameClock.playingAngle):
+          doneNotesCount += 1
+          displayNotesCount -= 1
+          miss += 1
 
       frame += 1
-      draw_texts(counter, GameClock.playingAngle)
+      draw_texts(counter, GameClock.playingAngle, hit, miss)
       pg.display.update()
       clock.tick(60)
 
