@@ -36,18 +36,35 @@ def main(frameLimit, bpm, tempo, startCount):
     def start(self):
       self.playing = True
 
-  class Notes:
-    def __init__(self, color, angle):
+  class Note:
+    def __init__(self, color, angle, tolerance=10, size=10):
       self.color = color
       self.angle = angle
+      self.tolerance = tolerance
+      self.size = size
+      center = screen.get_rect().center
+      radius = 100
+      x = center[0] + radius * math.cos(math.radians(self.angle - 90))
+      y = center[1] + radius * math.sin(math.radians(self.angle - 90))
+      self.pos = (x, y)
 
-    def draw(self):
-      pass
+    def draw(self, screen):
+      pg.draw.circle(screen, pg.Color(self.color), self.pos, self.size)
 
-    def hit(self):
-      pass
+    def hitCheck(self, screen, angle):
+      if abs(angle - self.angle) < self.tolerance:
+        return True
+      pg.draw.circle(screen, pg.Color(self.color), self.pos, self.size)
+      return False
+
+    def missCheck(self, screen, angle):
+      if angle - self.angle > self.tolerance:
+        return True
+      pg.draw.circle(screen, pg.Color(self.color), self.pos, self.size)
+      return False
 
   # テキスト描画関数
+
   def draw_texts(counter, angle):
     cnt_str = f'tempo counter:{counter:05}'
     angle_str = f'angle:{angle:05}'
@@ -69,6 +86,9 @@ def main(frameLimit, bpm, tempo, startCount):
   counter = 0
   exit_flag = False
   exit_code = '000'
+  notes = [360, 450, 540, 630]
+  notesCount = 0
+  gameColor = "RED"
 
   try:
     pg.mixer.music.load("Polygons.mp3")
@@ -76,7 +96,10 @@ def main(frameLimit, bpm, tempo, startCount):
     print(f'音声ファイルの読み込みに失敗しました: {e}')
     exit_flag = True
     exit_code = '101'
-  GameClock = Clock("RED", bpm, tempo)
+  GameClock = Clock(gameColor, bpm, tempo)
+  for num in range(len(notes)):
+    globals()[f"note{num + 1}"] = Note(gameColor, notes[num])
+
   while not exit_flag:
     # カウントダウン処理
     while counter < startCount + 1 and not exit_flag:
@@ -112,10 +135,15 @@ def main(frameLimit, bpm, tempo, startCount):
         if event.type == pg.QUIT:
           exit_flag = True
           exit_code = '001'
+        if event.type == pg.KEYDOWN:
+          pass
       screen.fill(pg.Color('BLACK'))
       if GameClock.draw(screen, frame):
         counter += 1
         pg.mixer.Sound('pip.mp3').play()
+      if notes[notesCount] - 360 < GameClock.playingAngle:
+        globals()[f"note{notesCount + 1}"].draw(screen)
+        notesCount += 1
 
       frame += 1
       draw_texts(counter, GameClock.playingAngle)
