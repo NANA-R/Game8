@@ -8,7 +8,7 @@ def main(frameLimit, bpm, tempo, startCount):
   class Clock:
     def __init__(self, color, bpm, screen, tempo=4):
       self.color = color
-      self.speed = bpm / 60 * 6 / tempo  # 1分間に回転する角度（度）
+      self.bpm = bpm
       self.angle = 0
       self.tempAngle = 0
       self.angleCount = 0
@@ -21,9 +21,10 @@ def main(frameLimit, bpm, tempo, startCount):
       center = self.screen.get_rect().center
       scrW, scrH = self.screen.get_size()
       radius = min(scrW, scrH) // 3
+      speed = self.bpm / 60 * 6 / tempo
       pg.draw.circle(self.screen, pg.Color(self.color), center, radius)
       pg.draw.circle(self.screen, pg.Color("BLACK"), center, radius // 1.05)
-      angle = (frame * self.speed) % 360 - 90
+      angle = (frame * speed) % 360 - 90
       end_x = center[0] + radius * 0.9 * math.cos(math.radians(angle))
       end_y = center[1] + radius * 0.9 * math.sin(math.radians(angle))
       pg.draw.line(self.screen, pg.Color(self.color), center, (end_x, end_y), 3)
@@ -32,34 +33,38 @@ def main(frameLimit, bpm, tempo, startCount):
         if self.tempAngle > self.angle:
           self.angleCount += 1
         self.playingAngle = 90 + self.angle + self.angleCount * 360
-      return angle % 90 < self.speed
+      return angle % 90 < speed
 
     def start(self):
       self.playing = True
 
   class Note:
-    def __init__(self, color, angle, screen, tolerance=10, size=10):
+    def __init__(self, color, angle, screen, tolerance=20, size=10):
+      self.screen = screen
       self.color = color
       self.angle = angle
       self.tolerance = tolerance
       self.size = size
       center = screen.get_rect().center
-      radius = 100
+      scrW, scrH = self.screen.get_size()
+      radius = min(scrW, scrH) // 5
       x = center[0] + radius * math.cos(math.radians(self.angle - 90))
       y = center[1] + radius * math.sin(math.radians(self.angle - 90))
       self.pos = (x, y)
-      self.screen = screen
 
-    def draw(self):
+    def draw(self, color):
+      self.color = color
       pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
 
     def hitCheck(self, angle):
-      if abs(angle - self.angle) < self.tolerance:
+      checkAngle = angle - self.angle
+      if checkAngle > self.tolerance * -0.5 and checkAngle < self.tolerance:
         return True
       pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
       return False
 
-    def missCheck(self, angle):
+    def update(self, angle, color):
+      self.color = color
       if angle - self.angle > self.tolerance:
         return True
       pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
@@ -67,13 +72,14 @@ def main(frameLimit, bpm, tempo, startCount):
 
   # テキスト描画関数
 
-  def draw_texts(counter, angle, hit, miss):
+  def draw_texts(counter, angle, hit, miss, color):
     cnt_str = f'tempo counter:{counter:05}'
     angle_str = f'angle:{angle:05}'
     hit_str = f'hit:{hit:05}'
     miss_str = f'miss:{miss:05}'
     screen.blit(font.render(cnt_str, True, 'WHITE'), (10, 10))
     screen.blit(font.render(angle_str, True, 'WHITE'), (10, 30))
+    screen.blit(font.render(color, True, color), (10, 50))
     screen.blit(font.render(hit_str, True, 'WHITE'), (10, 600))
     screen.blit(font.render(miss_str, True, 'WHITE'), (10, 620))
 
@@ -90,18 +96,36 @@ def main(frameLimit, bpm, tempo, startCount):
   counter = 0
   exit_flag = False
   exit_code = '000'
-  notes = [360, 450, 540, 630,
-           720, 810, 900, 1050,
-           1080, 1170, 1260, 1350,
-           1440, 1530, 1620, 1770,
-           1800, 1890, 1980, 2070,
-           2160, 2250, 2340, 2490,
-           2520, 2610, 2700, 2790,
-           2880, 2970, 3060, 3150]
+  gameColor = "RED"
+  notesAngle = [360, 90, 90, 90, 90, 90, 90,
+                150, 30, 90, 90, 90, 90, 90,
+                90, 150, 30, 90, 90, 90, 90,
+                90, 90, 150, 30, 90, 90, 90,
+                90, 60, 30, 60, 30, 90, 90, "BLUE",
+                90, 30, 60, 60, 90, 30, 90,
+                90, 90, 90, 90, 30, 60, 60,
+                90, 30, 90, 90, 90, 90, 90,
+                30, 60, 60, 90, 30, 90, 90,
+                90, 90, 90, 30, 60, 60, 90,
+                30, 90, 90, 30, 60, 30, 60,
+                60, 30, "YELLOW", 90, 90, 90,
+                90, 90, 60, 30, 60, 30, 90, 90, 90, 90]
+  notes = []
+  changeColorTimings = []
+  changeBPMTimings = []
+  tempAngle = 0
+  for content in notesAngle:
+    if type(content) == int:
+      tempAngle += content
+      notes.append(tempAngle)
+    elif type(content) == str:
+      changeColorTimings.append([tempAngle, content])
+    else:
+      changeBPMTimings.append([tempAngle, content])
+
   notesCount = 0
   displayNotesCount = 0
   doneNotesCount = 0
-  gameColor = "RED"
   miss = 0
   hit = 0
   key = False
@@ -135,7 +159,7 @@ def main(frameLimit, bpm, tempo, startCount):
         counter += 1
       # フレームカウンタの表示
       frame += 1
-      draw_texts(counter, GameClock.playingAngle, hit, miss)
+      draw_texts(counter, GameClock.playingAngle, hit, miss, gameColor)
 
       # 画面の更新とフレームレートの設定
       pg.display.update()
@@ -155,30 +179,38 @@ def main(frameLimit, bpm, tempo, startCount):
           key = True
         if event.type == pg.KEYUP:
           key = False
-
       screen.fill(pg.Color('BLACK'))
-      if GameClock.draw(frame):
-        counter += 1
-#        pg.mixer.Sound('pip.mp3').play()
+      for timing in changeColorTimings:
+        if timing[0] < GameClock.playingAngle:
+          gameColor = timing[1]
+          GameClock.color = gameColor
+          changeColorTimings.remove(timing)
+      for timing in changeBPMTimings:
+        if timing[0] < GameClock.playingAngle:
+          GameClock.bpm *= timing[1]
+          changeBPMTimings.remove(timing)
       try:
         if notes[notesCount] - 360 < GameClock.playingAngle:
-          globals()[f"note{notesCount + 1}"].draw()
+          globals()[f"note{notesCount + 1}"].draw(gameColor)
           displayNotesCount += 1
           notesCount += 1
       except IndexError:
         pass
+      if GameClock.draw(frame):
+        counter += 1
       for num in range(1, displayNotesCount):
         if globals()[f"note{num + doneNotesCount}"].hitCheck(GameClock.playingAngle) and key:
           doneNotesCount += 1
           displayNotesCount -= 1
           hit += 1
-        if globals()[f"note{num + doneNotesCount}"].missCheck(GameClock.playingAngle):
+          pg.mixer.Sound('pip.mp3').play()
+        elif globals()[f"note{num + doneNotesCount}"].update(GameClock.playingAngle, gameColor):
           doneNotesCount += 1
           displayNotesCount -= 1
           miss += 1
 
       frame += 1
-      draw_texts(counter, GameClock.playingAngle, hit, miss)
+      draw_texts(counter, GameClock.playingAngle, hit, miss, gameColor)
       pg.display.update()
       clock.tick(60)
 
@@ -190,5 +222,5 @@ def main(frameLimit, bpm, tempo, startCount):
 
 
 if __name__ == "__main__":
-  code = main(300, 130, 4, 7.5)
+  code = main(300, 130, 4, 8)
   print(f'プログラムを「コード{code}」で終了しました。')
