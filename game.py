@@ -8,6 +8,7 @@ def main(frameLimit, bpm, tempo, startCount):
   class Clock:
     def __init__(self, color, bpm, screen, tempo=4):
       self.color = color
+      self.tempo = tempo
       self.bpm = bpm
       self.angle = 0
       self.tempAngle = 0
@@ -21,13 +22,14 @@ def main(frameLimit, bpm, tempo, startCount):
       center = self.screen.get_rect().center
       scrW, scrH = self.screen.get_size()
       radius = min(scrW, scrH) // 3
-      speed = self.bpm / 60 * 6 / tempo
+      speed = self.bpm / 60 * 6 / self.tempo  # 要改善
       pg.draw.circle(self.screen, pg.Color(self.color), center, radius)
       pg.draw.circle(self.screen, pg.Color("BLACK"), center, radius // 1.05)
       angle = (frame * speed) % 360 - 90
       end_x = center[0] + radius * 0.9 * math.cos(math.radians(angle))
       end_y = center[1] + radius * 0.9 * math.sin(math.radians(angle))
-      pg.draw.line(self.screen, pg.Color(self.color), center, (end_x, end_y), 3)
+      pg.draw.line(self.screen, pg.Color(
+          self.color), center, (end_x, end_y), 3)
       self.angle = int(angle)
       if self.playing:
         if self.tempAngle > self.angle:
@@ -110,7 +112,12 @@ def main(frameLimit, bpm, tempo, startCount):
                 30, 90, 90, 30, 60, 30, 60,
                 60, 30, "YELLOW", 90, 90, 90,
                 90, 90, 60, 30, 60, 30, 90,
-                90, 90, 90, 30, 60, 30, 60,]
+                90, 90, 90, 30, 60, 30, 60,
+                30, 60, 90, 90, 90, 150, 30, 90, 90,
+                150, 30, 90, 90, 90, 90, 60, 30, 60, 30, 90, 90, "GRAY", 0.5,
+                90, 90, 90, 30, 30, 30, 90, 90, 90, 60, 30,
+                90, 90, 90, 90, 90, 90, 90, 60, 30, "WHITE", 2.0,
+                90, 90, 90]
   notes = []
   changeColorTimings = []
   changeBPMTimings = []
@@ -124,13 +131,14 @@ def main(frameLimit, bpm, tempo, startCount):
     else:
       changeBPMTimings.append([tempAngle, content])
 
+  mag = 1
   notesCount = 0
   displayNotesCount = 0
   doneNotesCount = 0
   miss = 0
   hit = 0
   key = False
-  autoPlay = True
+  autoPlay = False
 
   try:
     pg.mixer.music.load("Polygons.mp3")
@@ -189,7 +197,7 @@ def main(frameLimit, bpm, tempo, startCount):
           changeColorTimings.remove(timing)
       for timing in changeBPMTimings:
         if timing[0] < GameClock.playingAngle:
-          GameClock.bpm *= timing[1]
+          mag *= timing[1]
           changeBPMTimings.remove(timing)
       try:
         if notes[notesCount] - 360 < GameClock.playingAngle:
@@ -224,7 +232,7 @@ def main(frameLimit, bpm, tempo, startCount):
       frame += 1
       draw_texts(counter, GameClock.playingAngle, hit, miss, gameColor)
       pg.display.update()
-      clock.tick(60)
+      clock.tick(60 * mag)
 
     pg.quit()
     return exit_code
