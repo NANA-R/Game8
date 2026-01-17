@@ -1,95 +1,27 @@
 import pygame as pg
 import time
-import math
-from copy import copy
+from codes import contents
+Clock = contents.Clock
+Note = contents.Note
 
-def main(frameLimit, bpm, tempo, startCount, fps, delay):
-
-  class Clock:
-    def __init__(self, color, bpm, screen, delay, tempo):
-      self.color = color
-      self.tempo = tempo
-      self.bpm = bpm
-      self.delay = delay
-      self.angle = 0
-      self.tempAngle = 0
-      self.angleCount = 0
-      self.playingAngle = 0
-      self.playing = False
-      self.screen = screen
-
-    def draw(self, frame):
-      self.tempAngle = copy(self.angle)
-      center = self.screen.get_rect().center
-      scrW, scrH = self.screen.get_size()
-      radius = min(scrW, scrH) // 3
-      speed = self.bpm / fps * 6 / self.tempo
-      pg.draw.circle(self.screen, pg.Color(self.color), center, radius)
-      pg.draw.circle(self.screen, pg.Color("BLACK"), center, radius // 1.05)
-      angle = (frame * speed) % 360 - 90
-      end_x = center[0] + radius * 0.9 * math.cos(math.radians(angle))
-      end_y = center[1] + radius * 0.9 * math.sin(math.radians(angle))
-      pg.draw.line(self.screen, pg.Color(
-          self.color), center, (end_x, end_y), 3)
-      self.angle = int(angle) + self.delay
-      if self.playing:
-        if self.tempAngle > self.angle:
-          self.angleCount += 1
-        self.playingAngle = 90 + self.angle + self.angleCount * 360
-      return angle % 90 < speed
-
-    def start(self):
-      self.playing = True
-
-  class Note:
-    def __init__(self, color, angle, screen, tolerance=20, size=10):
-      self.screen = screen
-      self.color = color
-      self.angle = angle
-      self.tolerance = tolerance
-      self.size = size
-      center = screen.get_rect().center
-      scrW, scrH = self.screen.get_size()
-      radius = min(scrW, scrH) // 5
-      x = center[0] + radius * math.cos(math.radians(self.angle - 90))
-      y = center[1] + radius * math.sin(math.radians(self.angle - 90))
-      self.pos = (x, y)
-
-    def draw(self, color):
-      self.color = color
-      pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
-
-    def hitCheck(self, angle):
-      checkAngle = angle - self.angle
-      if checkAngle > self.tolerance * -0.5 and checkAngle < self.tolerance:
-        return True
-      pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
-      return False
-
-    def update(self, angle, color):
-      self.color = color
-      if angle - self.angle > self.tolerance:
-        return True
-      pg.draw.circle(self.screen, pg.Color(self.color), self.pos, self.size)
-      return False
+def game(tempoLimit, bpm, tempo, startCount, fps, auto=False):
 
   # テキスト描画関数
-
   def draw_texts(counter, angle, hit, miss, color):
-    cnt_str = f'tempo counter:{counter:05}'
-    angle_str = f'angle:{angle:05}'
+    # cnt_str = f'tempo counter:{counter:05}'
+    # angle_str = f'angle:{angle:05}'
     hit_str = f'hit:{hit:05}'
     miss_str = f'miss:{miss:05}'
-    screen.blit(font.render(cnt_str, True, 'WHITE'), (10, 10))
-    screen.blit(font.render(angle_str, True, 'WHITE'), (10, 30))
-    screen.blit(font.render(color, True, color), (10, 50))
-    screen.blit(font.render(hit_str, True, 'WHITE'), (10, 600))
-    screen.blit(font.render(miss_str, True, 'WHITE'), (10, 620))
+    # screen.blit(font.render(cnt_str, True, 'WHITE'), (10, 10))
+    # screen.blit(font.render(angle_str, True, 'WHITE'), (10, 30))
+    # screen.blit(font.render(color, True, color), (10, 50))
+    screen.blit(font.render(hit_str, True, "WHITE"), (10, 600))
+    screen.blit(font.render(miss_str, True, "WHITE"), (10, 620))
 
   # 初期化処理
   pg.init()
   pg.mixer.pre_init(44100, -16, 2, 1024)
-  pg.display.set_caption('RedArchibe')
+  pg.display.set_caption('Rhythm Timer')
   disp_w = 640
   disp_h = 640
   screen = pg.display.set_mode((disp_w, disp_h))
@@ -121,7 +53,12 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
                 90, 90, 90, 90, 90, 90, 90, 30, 30, 30, 90, 90, 90, 90, 90, 30, 30, 30,
                 60, 60, 60, 90, 90, 90, 90, 90, 90, 90, 30, 30, 30, 90, 90, 90, 90,
                 60, 30, 60, 30, 90, 90, "GREEN",
-                90, 30, 60, 60, 60, 60]
+                90, 30, 60, 60, 60, 60, 90, 90, 90, 90, 90, 30, 60, 60, 60, 60, 90, 90,
+                60, 30, 60, 30, 90, 90, 90, 30, 30, 30, 90, 90, 90, 30, 30, 30, 90, 60, 120,
+                90, 90, 60, 120, 90, 90, 30, 60, 60, 60, 60, 90, 90, 90, 90,
+                90, 30, 60, 60, 60, 60, 90, 90, 60, 30, 60, 30, 90, 90, 90, 30, 30, 30,
+                90, 90, 90, 30, 30, 30, 90, 90, 90, 90, 90, 90, 90, 90, "RED", 0.5,
+                180, 30, 60, 30, 30, 30, 180, 30, 60, 30, 30, 30, 180, 30, 60, 30, 30, 30, 180, 30, 60, 30, 30, 30]
   notes = []
   changeColorTimings = []
   changeBPMTimings = []
@@ -142,15 +79,16 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
   miss = 0
   hit = 0
   key = False
-  autoPlay = False
+  autoPlay = auto
 
   try:
-    pg.mixer.music.load("Polygons.mp3")
+    pg.mixer.music.load("./assets/Polygons.mp3")
+    peep = "./assets/pip.mp3"
   except Exception as e:
     print(f'音声ファイルの読み込みに失敗しました: {e}')
     exit_flag = True
     exit_code = '101'
-  GameClock = Clock(gameColor, bpm, screen, 0, tempo)
+  GameClock = Clock(gameColor, bpm, screen, tempo, fps)
   for num in range(len(notes)):
     globals()[f"note{num + 1}"] = Note(gameColor, notes[num], screen)
 
@@ -169,7 +107,7 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
       # 描画処理
       if GameClock.draw(frame):
         if startCount - counter <= tempo and startCount != counter:
-          pg.mixer.Sound('pip.mp3').play()
+          pg.mixer.Sound(peep).play()
         counter += 1
       # フレームカウンタの表示
       frame += 1
@@ -181,16 +119,10 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
 
     # 音楽の再生開始
     if not exit_flag:
-      if GameClock.delay >= 0:
-        pg.mixer.music.play()
-        time.sleep(GameClock.delay)
-        GameClock.start()
-      else:
-        GameClock.start()
-        time.sleep(GameClock.delay * -1)
-        pg.mixer.music.play()
+      pg.mixer.music.play()
+      GameClock.start()
 
-    while counter < frameLimit and not exit_flag:
+    while counter < tempoLimit and not exit_flag:
       for event in pg.event.get():
         if event.type == pg.QUIT:
           exit_flag = True
@@ -217,7 +149,10 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
       except IndexError:
         pass
       if GameClock.draw(frame):
+        if counter % 5 == 0:
+          time.sleep(0.001)
         counter += 1
+
       if not autoPlay:
         for num in range(1, displayNotesCount):
           if globals()[f"note{num + doneNotesCount}"].hitCheck(GameClock.playingAngle) and key:
@@ -225,10 +160,11 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
             displayNotesCount -= 1
             hit += 1
             key = False
-            pg.mixer.Sound('pip.mp3').play()
+            pg.mixer.Sound(peep).play()
           elif globals()[f"note{num + doneNotesCount}"].update(GameClock.playingAngle, gameColor):
             doneNotesCount += 1
             displayNotesCount -= 1
+            time.sleep(0.05)
             miss += 1
 
       else:
@@ -237,7 +173,7 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
             doneNotesCount += 1
             displayNotesCount -= 1
             hit += 1
-            pg.mixer.Sound('pip.mp3').play()
+            pg.mixer.Sound(peep).play()
           else:
             globals()[f"note{num + doneNotesCount}"].draw(gameColor)
 
@@ -247,12 +183,11 @@ def main(frameLimit, bpm, tempo, startCount, fps, delay):
       clock.tick(fps * mag)
 
     pg.quit()
-    return exit_code
+    return exit_code, hit, miss
 
   pg.quit()
   return "109"
 
 
 if __name__ == "__main__":
-  code = main(300, 130, 4, 8, 30, 0)
-  print(f'プログラムを「コード{code}」で終了しました。')
+  print("This module is not for direct execution.")
